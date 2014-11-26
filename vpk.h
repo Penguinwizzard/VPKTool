@@ -9,7 +9,7 @@
 #include<stdbool.h>
 #include<string.h>
 
-#define NAMELENGTH (128)
+#define NAMELENGTH (256)
 //#define VPKLIB_DUBUG 1
 
 // The base header type for casting
@@ -155,6 +155,7 @@ int traverse_for_read(unsigned char* buffer, unsigned int buflen, vpkentry* entr
 	unsigned int level = 0;
 	unsigned char* curext;
 	unsigned char* curpath;
+	unsigned char curpathfixed[NAMELENGTH];
 	int count = 0;
 	while(true) {
 		if(index >= buflen) {
@@ -182,6 +183,36 @@ int traverse_for_read(unsigned char* buffer, unsigned int buflen, vpkentry* entr
 				while(buffer[index] != '\0')
 					index++;
 				index++;
+				//fix path
+				snprintf((char*)curpathfixed,NAMELENGTH,"%s",curpath);
+				//remove leading spaces
+				int i,j;
+				for(i=0;i<NAMELENGTH;i++) {
+					if(curpathfixed[i]!=' ')
+						break;
+				}
+				for(j=0;j<NAMELENGTH-i;j++) {
+					curpathfixed[j]=curpathfixed[j+i];
+				}
+				//remove trailing space
+				for(i=0;i<NAMELENGTH;i++) {
+					if(curpathfixed[i]=='\0')
+						break;
+				}
+				for(j=i-1;j>=0;j--) {
+					if(curpathfixed[j]!=' ')
+						break;
+					curpathfixed[j]='\0';
+				}
+				//add trailing /
+				for(i=0;i<NAMELENGTH;i++) {
+					if(curpathfixed[i]=='\0')
+						break;
+				}
+				if(i!=0 && curpathfixed[i-1]!='/' && i<NAMELENGTH-1) {
+					curpathfixed[i]='/';
+					curpathfixed[i+1]='\0';
+				}
 				break;
 			case 2: //file level
 				//throwaway due to switch conventions
@@ -196,7 +227,7 @@ int traverse_for_read(unsigned char* buffer, unsigned int buflen, vpkentry* entr
 				index += sizeof(vpkdirectoryentry);
 				index += filedata->preload_bytes;
 				if(entries != NULL) {
-					snprintf(entries[count].fullname,NAMELENGTH,"%s%s.%s",curpath,filename,curext);
+					snprintf(entries[count].fullname,NAMELENGTH,"%s%s.%s",curpathfixed,filename,curext);
 					entries[count].entry = filedata;
 				}
 #ifdef VPKLIB_DEBUG
