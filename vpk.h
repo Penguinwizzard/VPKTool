@@ -59,7 +59,7 @@ typedef struct {
 // A vpk handle, used so that applications using the library can use it
 // in a re-entrant manner.
 typedef struct {
-	unsigned char* buffer;
+	char* buffer;
 	unsigned int buflen;
 	int version;
 	vpkheader_generic* header; // NULL if version==0
@@ -67,7 +67,7 @@ typedef struct {
 	vpkentry* entries;
 } vpk;
 
-int traverse_for_read(unsigned char* buffer, unsigned int buflen, vpkentry* entries);
+int traverse_for_read(char* buffer, unsigned int buflen, vpkentry* entries);
 int vpkentry_comp(const void* elem1, const void* elem2);
 
 // Given a FILE*, read the vpk _dir information described by that FILE*
@@ -77,7 +77,7 @@ vpk* readvpk(FILE* vpk_file_pointer) {
 	fseek(vpk_file_pointer, 0, SEEK_SET);
 	// we need to handle version 0 properly
 	if(
-		(fread((unsigned char*)vpkheader, sizeof(vpkheader_generic), 1, vpk_file_pointer) == 0)
+		(fread((char*)vpkheader, sizeof(vpkheader_generic), 1, vpk_file_pointer) == 0)
 	  )
 	{
 		free(ret);
@@ -115,7 +115,7 @@ vpk* readvpk(FILE* vpk_file_pointer) {
 			//type 2 is a little bigger header
 			free(vpkheader);
 			vpkheader = (vpkheader_generic*)malloc(sizeof(vpkheader_v2));
-			if(fread((unsigned char*)vpkheader, sizeof(vpkheader_v2), 1, vpk_file_pointer) == 0) {
+			if(fread((char*)vpkheader, sizeof(vpkheader_v2), 1, vpk_file_pointer) == 0) {
 				free(ret);
 				free(vpkheader);
 				return NULL;
@@ -130,7 +130,7 @@ vpk* readvpk(FILE* vpk_file_pointer) {
 			return NULL;
 	}
 	// at this point the seek in the file is set to the end of the header
-	ret->buffer = (unsigned char*)malloc(ret->buflen);
+	ret->buffer = (char*)malloc(ret->buflen);
 	fread(ret->buffer, ret->buflen, 1, vpk_file_pointer);
 
 	// get the number of entries
@@ -147,23 +147,17 @@ vpk* readvpk(FILE* vpk_file_pointer) {
 // Helper function for readvpk; traverses the vpk's tree and returns
 // the number of elements in the tree, and if entries is non-null also
 // copies pointers into entries
-int traverse_for_read(unsigned char* buffer, unsigned int buflen, vpkentry* entries) {
+int traverse_for_read(char* buffer, unsigned int buflen, vpkentry* entries) {
 	// ok, now we've read the tree in (at least; there may be a little more read).
 	// all that's left is to parse it
 	// this is the tree read routine
 	unsigned int index = 0;
 	unsigned int level = 0;
-	unsigned char* curext;
-	unsigned char* curpath;
-	unsigned char curpathfixed[NAMELENGTH];
+	char* curext = "";
+	char* curpath = "";
+	char curpathfixed[NAMELENGTH];
 	int count = 0;
-	while(true) {
-		if(index >= buflen) {
-			break;
-		}
-		if(level < 0) {
-			break;
-		}
+	while(index < buflen && level >= 0) {
 		if(buffer[index]=='\0') {
 			level--;
 			index++;
@@ -171,14 +165,14 @@ int traverse_for_read(unsigned char* buffer, unsigned int buflen, vpkentry* entr
 		}
 		switch(level) {
 			case 0: //ext level
-				curext = (unsigned char*)&(buffer[index]);
+				curext = (char*)&(buffer[index]);
 				level++;
 				while(buffer[index] != '\0')
 					index++;
 				index++;
 				break;
 			case 1: //path level
-				curpath = (unsigned char*)&(buffer[index]);
+				curpath = (char*)&(buffer[index]);
 				level++;
 				while(buffer[index] != '\0')
 					index++;
@@ -219,7 +213,7 @@ int traverse_for_read(unsigned char* buffer, unsigned int buflen, vpkentry* entr
 				if(entries != NULL) {
 					entries[count].fullname = (char*)malloc(NAMELENGTH*sizeof(char));
 				}
-				unsigned char* filename = (unsigned char*)&(buffer[index]);
+				char* filename = (char*)&(buffer[index]);
 				while(buffer[index] != '\0')
 					index++;
 				index++;
@@ -298,4 +292,24 @@ void printdiff(vpk* a, vpk* b) {
 			rightindex++;
 		}	
 	}
+}
+
+// Create a vpk from scratch
+vpk* createvpk() {
+	vpk* ret = (vpk*)malloc(sizeof(vpk));
+	ret->buffer = NULL;
+	ret->buflen = 0;
+	ret->version = 2;
+	ret->header = (vpkheader_generic*)malloc(sizeof(vpkheader_v2));
+	((vpkheader_v2*)(ret->header))->signature    = 0x55aa1234;
+	((vpkheader_v2*)(ret->header))->version      = 0x00000002;
+	((vpkheader_v2*)(ret->header))->tree_length  = 0x00000000;
+
+	((vpkheader_v2*)(ret->header))->unknown1     = 0x00000000;
+	((vpkheader_v2*)(ret->header))->footerlength = 0x00000000;
+	((vpkheader_v2*)(ret->header))->unknown3     = 0x00000000;
+	((vpkheader_v2*)(ret->header))->unknown4     = 0x00000000;
+	ret->entrycount = 0;
+	ret->entries = NULL;
+	return ret;
 }

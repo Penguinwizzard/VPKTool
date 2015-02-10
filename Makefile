@@ -1,6 +1,6 @@
 CC=gcc
-CFLAGS=-std=c99 -c -Wall
-LDFLAGS=-lm
+CFLAGS=-std=c99 -c -Wall -O3
+LDFLAGS=-lm -O3
 SOURCES=VPKTool.c vpk.h
 OBJECTS=$(SOURCES:.c=.o)
 EXECUTABLE=vpktool
